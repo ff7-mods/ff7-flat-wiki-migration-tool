@@ -1,0 +1,18 @@
+{
+  "name": "ff7-flat-wiki-migration-tool",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "download": "node download-files.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.3",
+    "fs-extra": "^9.0.1",
+    "glob-promise": "^3.4.0",
+    "got": "^11.8.0",
+    "node-pandoc-promise": "0.0.6"
+  }
+}
