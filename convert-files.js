@@ -6,10 +6,10 @@ const glob = require('glob-promise')
 const MEDIAWIKI_DIR_PAGES = './output/mediawiki/pages'
 const MEDIAWIKI_DIR_ASSETS = './output/mediawiki/assets'
 
+const OUTPUT_ROOT_FOLDER = 'ff7-flat-wiki'
 const PANDOC_DIR_PAGES = './output/pandoc/pages'
-const OUTPUT_DIR_PAGES = './output/markdown/pages'
-
-const OUTPUT_DIR_ASSETS = './output/markdown/assets'
+const OUTPUT_DIR_PAGES = `./output/markdown/${OUTPUT_ROOT_FOLDER}`
+const OUTPUT_DIR_ASSETS = `./output/markdown/${OUTPUT_ROOT_FOLDER}/assets`
 
 const getMediaWikiPageNames = async () => {
   const mediaWikiPageNames = await glob(`**/*.mw`, {cwd: MEDIAWIKI_DIR_PAGES})
@@ -56,9 +56,9 @@ const cleanLink = (link) => {
     link = `#user-content-${link.toLowerCase().replace(/[ _]/g, '-').replace('#', '')}`
   } else if (!link.startsWith('http')) {
     if (isImage(link)) {
-      link = '/assets/' + link
+      link = `/${OUTPUT_ROOT_FOLDER}/assets/${link}`
     } else {
-      link = '/pages/' + link
+      link = `/${OUTPUT_ROOT_FOLDER}/${link}`
       if (link.includes('#')) {
         const hashIndex = link.indexOf('#')
         const hash = link.substring(hashIndex)
@@ -130,6 +130,31 @@ const amendLink = (page) => {
   //   console.log('page', page)
   return page
 }
+const addBreadcrumb = (page, markdownPageName) => {
+  const breadcrumbs = [{ title: 'Home', link: `/${OUTPUT_ROOT_FOLDER}/Main Page.md` }]
+  const prevSection = []
+  const sections = markdownPageName.replace('.md', '').split('/')
+  for (let i = 0; i < sections.length; i++) {
+    const section = sections[i]
+    prevSection.push(section)
+    breadcrumbs.push({ title: section, link: `/${OUTPUT_ROOT_FOLDER}/${prevSection.join('/')}.md` })
+  }
+  const breadcrumbsMarkdown = breadcrumbs.map((b, i) => {
+    if (i === breadcrumbs.length - 1) {
+      return b.title
+    }
+    return `[${b.title}](${b.link.replace(/[ _]/g, '%20')})`
+  }).join(' > ')
+  //   console.log('addBreadcrumb', markdownPageName, sections, breadcrumbs, breadcrumbsMarkdown)
+
+  page = `${breadcrumbsMarkdown}\n\n${page}`
+  return page
+}
+const addFrontMatter = (page, markdownPageName) => {
+  const title = markdownPageName.substring(markdownPageName.lastIndexOf('/') + 1, markdownPageName.lastIndexOf('.'))
+  page = `---\ntitle: ${title}\n---\n\n${page}`
+  return page
+}
 const amendLinks = async () => {
   await fs.remove(OUTPUT_DIR_PAGES)
   const markdownPageNames = await getMarkdownPageNames()
@@ -139,7 +164,7 @@ const amendLinks = async () => {
     const pandocFile = path.join(PANDOC_DIR_PAGES, markdownPageName)
     const markdownFile = path.join(OUTPUT_DIR_PAGES, markdownPageName)
     const content = await fs.readFile(pandocFile, 'utf8')
-    const updatedContent = amendHTMLLink(amendLink(content))
+    const updatedContent = addFrontMatter(addBreadcrumb(amendHTMLLink(amendLink(content)), markdownPageName), markdownPageName)
     const markdownDir = path.dirname(markdownFile)
     await fs.ensureDir(markdownDir)
     await fs.writeFile(markdownFile, updatedContent)
@@ -150,16 +175,18 @@ const moveAssets = async () => {
   await fs.ensureDir(OUTPUT_DIR_ASSETS)
   await fs.copy(MEDIAWIKI_DIR_ASSETS, OUTPUT_DIR_ASSETS)
 }
-const init = async () => {
+const initConvertFiles = async () => {
   try {
     console.log('Converting to markdown: START')
     // await convertToMarkdown()
-    await moveAssets()
     await amendLinks()
+    await moveAssets()
     console.log('Converting to markdown: END')
   } catch (error) {
     console.error(`Converting to markdown: ERROR - ${error.message}`)
   }
 }
 
-init()
+module.exports = {
+  initConvertFiles
+}

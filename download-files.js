@@ -73,7 +73,7 @@ const downloadFiles = async () => {
     console.log(`File downloaded to ${fileName}`)
   })
 }
-const init = async () => {
+const initDownloadFiles = async () => {
   console.log('Downloading wiki data: START')
   try {
     const allPageNames = await getAllPageNames()
@@ -85,4 +85,6 @@ const init = async () => {
   }
 }
 
-init()
+module.exports = {
+  initDownloadFiles
+}
