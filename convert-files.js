@@ -56,9 +56,9 @@ const cleanLink = (link) => {
     link = `#user-content-${link.toLowerCase().replace(/[ _]/g, '-').replace('#', '')}`
   } else if (!link.startsWith('http')) {
     if (isImage(link)) {
-      link = `/${OUTPUT_ROOT_FOLDER}/assets/${link}`
+      link = `/assets/${link}`
     } else {
-      link = `/${OUTPUT_ROOT_FOLDER}/${link}`
+      link = `/${link}`
       if (link.includes('#')) {
         const hashIndex = link.indexOf('#')
         const hash = link.substring(hashIndex)
@@ -91,8 +91,9 @@ const amendHTMLLink = (page) => {
   }
   return page
 }
-
 const amendLink = (page) => {
+  page = page.replace(/\[ /g, '[') // Some whitespace at the beginning of some links
+
   const regex = /(\[.+\]:) (.+)/g
   let match
   let replacements = []
@@ -131,13 +132,13 @@ const amendLink = (page) => {
   return page
 }
 const addBreadcrumb = (page, markdownPageName) => {
-  const breadcrumbs = [{ title: 'Home', link: `/${OUTPUT_ROOT_FOLDER}/Main Page.md` }]
+  const breadcrumbs = [{ title: 'Home', link: `/Main Page.md` }]
   const prevSection = []
   const sections = markdownPageName.replace('.md', '').split('/')
   for (let i = 0; i < sections.length; i++) {
     const section = sections[i]
     prevSection.push(section)
-    breadcrumbs.push({ title: section, link: `/${OUTPUT_ROOT_FOLDER}/${prevSection.join('/')}.md` })
+    breadcrumbs.push({ title: section, link: `/${prevSection.join('/')}.md` })
   }
   const breadcrumbsMarkdown = breadcrumbs.map((b, i) => {
     if (i === breadcrumbs.length - 1) {
@@ -178,7 +179,7 @@ const moveAssets = async () => {
 const initConvertFiles = async () => {
   try {
     console.log('Converting to markdown: START')
-    await convertToMarkdown()
+    // await convertToMarkdown()
     await amendLinks()
     await moveAssets()
     console.log('Converting to markdown: END')
