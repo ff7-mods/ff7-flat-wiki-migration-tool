@@ -178,7 +178,7 @@ const moveAssets = async () => {
 const initConvertFiles = async () => {
   try {
     console.log('Converting to markdown: START')
-    // await convertToMarkdown()
+    await convertToMarkdown()
     await amendLinks()
     await moveAssets()
     console.log('Converting to markdown: END')
