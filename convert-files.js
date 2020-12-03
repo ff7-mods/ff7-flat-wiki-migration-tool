@@ -5,6 +5,7 @@ const glob = require('glob-promise')
 
 const MEDIAWIKI_DIR_PAGES = './output/mediawiki/pages'
 const MEDIAWIKI_DIR_ASSETS = './output/mediawiki/assets'
+const MEDIAWIKI_REDIRECTS = './output/mediawiki/redirects.json'
 
 const OUTPUT_ROOT_FOLDER = 'ff7-flat-wiki'
 const PANDOC_DIR_PAGES = './output/pandoc/pages'
@@ -30,7 +31,7 @@ const convertToMarkdown = async () => {
     const markdownDir = path.dirname(markdownFile)
     // console.log('markdownFile', mediaWikiFile, '->', markdownFile, 'in', markdownDir)
     await fs.ensureDir(markdownDir)
-    await pandoc(mediaWikiFile, ['-f', 'mediawiki', '-t', 'gfm', '-o', markdownFile, '--reference-links'])
+    await pandoc(mediaWikiFile, ['-f', 'mediawiki', '-t', 'gfm', '-o', markdownFile, '--wrap=none'])
     convertedPageNames.push(markdownPageName)
   }
   return convertedPageNames
@@ -51,14 +52,24 @@ const isImage = (fileName) => {
   }
   return false
 }
-const cleanLink = (link) => {
+const applyRedirect = (link, redirects) => {
+  const potentialRedirects = redirects.filter(r => r.from === link)
+  if (potentialRedirects.length > 0 && link.toLowerCase().includes('engine')) {
+    console.log('redirect', link, potentialRedirects[0])
+    link = potentialRedirects[0].to
+  }
+  return link
+}
+const cleanLink = (link, currentPage, redirects) => {
   if (link.startsWith('#')) {
-    link = `#user-content-${link.toLowerCase().replace(/[ _]/g, '-').replace('#', '')}`
+    link = `#${link.toLowerCase().replace(/[ _]/g, '-').replace('#', '')}`
   } else if (!link.startsWith('http')) {
+    link = applyRedirect(link, redirects)
     if (isImage(link)) {
-      link = `/assets/${link}`
+      link = `assets/${link}`
+      console.log('isImage', link)
     } else {
-      link = `/${link}`
+      link = `${link}`
       if (link.includes('#')) {
         const hashIndex = link.indexOf('#')
         const hash = link.substring(hashIndex)
@@ -67,11 +78,14 @@ const cleanLink = (link) => {
         link = link + '.md'
       }
     }
-    link = link.replace(/_/g, '%20')
+    let relativeLink = path.relative(currentPage, link)
+    relativeLink = relativeLink.substring(3)
+    // console.log('link', currentPage, link, relativeLink)
+    link = relativeLink
   }
   return link
 }
-const amendHTMLLink = (page) => {
+const amendHTMLLink = (page, markdownPageName, redirects) => {
   const regex = /href="([^"]*)"/g
   let match
   let replacements = []
@@ -81,7 +95,7 @@ const amendHTMLLink = (page) => {
     }
     const wholeLink = match[0]
     const href = match[1]
-    const link = cleanLink(href)
+    const link = cleanLink(href, markdownPageName, redirects)
     // console.log('amendHTMLLink', wholeLink, href, link)
     replacements.push({replace: wholeLink, with: `href="${link}"`})
   }
@@ -91,10 +105,10 @@ const amendHTMLLink = (page) => {
   }
   return page
 }
-const amendLink = (page) => {
+const amendLink = (page, markdownPageName, redirects) => {
   page = page.replace(/\[ /g, '[') // Some whitespace at the beginning of some links
-
-  const regex = /(\[.+\]:) (.+)/g
+  page = page.replace(/<center>/g, '').replace(/<\/center>/g, '') // Lots of markdown links are wrapped in center blocks
+  const regex = /(\[.*\])\((.+)\)/g
   let match
   let replacements = []
   while ((match = regex.exec(page)) !== null) {
@@ -113,38 +127,39 @@ const amendLink = (page) => {
       updatedLinkAndTitle = updatedLinkAndTitle.substring(0, t1 - 1)
     //   console.log('t1', t1, t2, title, '-' + updatedLinkAndTitle + '-')
     }
-    updatedLinkAndTitle = cleanLink(updatedLinkAndTitle)
+    updatedLinkAndTitle = cleanLink(updatedLinkAndTitle, markdownPageName, redirects)
 
     if (title.length > 0) {
-      updatedLinkAndTitle = `${updatedLinkAndTitle} ${title}`
+      updatedLinkAndTitle = `${updatedLinkAndTitle}`
     }
 
-    const updatedWholeLink = `${linkTitle} ${updatedLinkAndTitle}`
+    const updatedWholeLink = `${linkTitle}(${updatedLinkAndTitle})`
     // console.log('match', wholeLink, '-', initialLinkAndTitle, '->', updatedWholeLink)
     replacements.push({replace: wholeLink, with: updatedWholeLink})
   }
   for (let i = 0; i < replacements.length; i++) {
     const replacement = replacements
     page = page.replace(replacement[i].replace, replacement[i].with)
+    page = page.replace(replacement[i].replace, replacement[i].with)
   }
 
   //   console.log('page', page)
   return page
 }
-const addBreadcrumb = (page, markdownPageName) => {
-  const breadcrumbs = [{ title: 'Home', link: `/Main Page.md` }]
+const addBreadcrumb = (page, markdownPageName, redirects) => {
+  const breadcrumbs = [{ title: 'Home', link: cleanLink(`Main_Page`, markdownPageName, redirects) }]
   const prevSection = []
   const sections = markdownPageName.replace('.md', '').split('/')
   for (let i = 0; i < sections.length; i++) {
     const section = sections[i]
     prevSection.push(section)
-    breadcrumbs.push({ title: section, link: `/${prevSection.join('/')}.md` })
+    breadcrumbs.push({ title: section.replace(/_/g, ' '), link: cleanLink(prevSection.join('/'), markdownPageName, redirects) })
   }
   const breadcrumbsMarkdown = breadcrumbs.map((b, i) => {
     if (i === breadcrumbs.length - 1) {
       return b.title
     }
-    return `[${b.title}](${b.link.replace(/[ _]/g, '%20')})`
+    return `[${b.title}](${b.link})`
   }).join(' > ')
   //   console.log('addBreadcrumb', markdownPageName, sections, breadcrumbs, breadcrumbsMarkdown)
 
@@ -159,16 +174,21 @@ const addFrontMatter = (page, markdownPageName) => {
 const amendLinks = async () => {
   await fs.remove(OUTPUT_DIR_PAGES)
   const markdownPageNames = await getMarkdownPageNames()
+  const redirects = await fs.readJson(MEDIAWIKI_REDIRECTS)
   for (let i = 0; i < markdownPageNames.length; i++) {
     const markdownPageName = markdownPageNames[i]
     // console.log('Amending links', (i + 1), 'of', markdownPageNames.length, ' - ', markdownPageName)
     const pandocFile = path.join(PANDOC_DIR_PAGES, markdownPageName)
     const markdownFile = path.join(OUTPUT_DIR_PAGES, markdownPageName)
-    const content = await fs.readFile(pandocFile, 'utf8')
-    const updatedContent = addFrontMatter(addBreadcrumb(amendHTMLLink(amendLink(content)), markdownPageName), markdownPageName)
+    let page = await fs.readFile(pandocFile, 'utf8')
+    page = amendLink(page, markdownPageName, redirects)
+    page = amendHTMLLink(page, markdownPageName, redirects)
+    page = addBreadcrumb(page, markdownPageName, redirects)
+    page = addFrontMatter(page, markdownPageName)
+
     const markdownDir = path.dirname(markdownFile)
     await fs.ensureDir(markdownDir)
-    await fs.writeFile(markdownFile, updatedContent)
+    await fs.writeFile(markdownFile, page)
   }
 }
 const moveAssets = async () => {

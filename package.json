@@ -14,5 +14,8 @@
     "glob-promise": "^3.4.0",
     "got": "^11.8.0",
     "node-pandoc-promise": "0.0.6"
+  },
+  "nodemonConfig": {
+    "ignore": ["**/*.json"]
   }
 }
