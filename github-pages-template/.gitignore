@@ -1,0 +1,5 @@
+node_modules/*
+output/*
+_site
+.jekyll-cache
+docs-config

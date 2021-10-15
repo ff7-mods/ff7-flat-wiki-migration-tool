@@ -183,7 +183,7 @@ const amendLinks = async () => {
     let page = await fs.readFile(pandocFile, 'utf8')
     page = amendLink(page, markdownPageName, redirects)
     page = amendHTMLLink(page, markdownPageName, redirects)
-    page = addBreadcrumb(page, markdownPageName, redirects)
+    // page = addBreadcrumb(page, markdownPageName, redirects)
     page = addFrontMatter(page, markdownPageName)
 
     const markdownDir = path.dirname(markdownFile)
@@ -199,7 +199,7 @@ const moveAssets = async () => {
 const initConvertFiles = async () => {
   try {
     console.log('Converting to markdown: START')
-    // await convertToMarkdown()
+    await convertToMarkdown()
     await amendLinks()
     await moveAssets()
     console.log('Converting to markdown: END')
