@@ -22,7 +22,7 @@ const scrapePage = async (url, list) => {
   let nextUrl = false
   const $ = cheerio.load(response.body)
   $('.mw-allpages-body a').each((i, link) => {
-    const title = link.attribs.href.replace('/index.php?title=', '')
+    const title = link.attribs.href.replace('/index.php/', '')
     list.push(title)
   })
   $('.mw-allpages-nav a:contains("Next page")').first().each((i, link) => {
@@ -43,9 +43,10 @@ const downloadPages = async (allPageNames) => {
   await fs.remove(OUTPUT_DIR_PAGES)
   for (let i = 0; i < allPageNames.length; i++) {
     //   for (let i = 0; i < 7; i++) {
-    console.log('Download Pages', (i + 1), 'of', allPageNames.length)
     const pageName = allPageNames[i]
-    const response = await got(EXPORT_URL_PAGES + pageName)
+    const url = EXPORT_URL_PAGES + pageName
+    console.log('Download Pages', (i + 1), 'of', allPageNames.length, '-', url)
+    const response = await got(url)
     const $ = cheerio.load(response.body, {xmlMode: true})
     const title = pageName
     const body = $('mediawiki page revision text').text()
@@ -53,7 +54,6 @@ const downloadPages = async (allPageNames) => {
     const dir = path.dirname(file)
     await fs.ensureDir(dir)
     await fs.writeFile(file, body)
-    console.log(title, dir, file)
   }
 }
 const downloadFiles = async () => {
