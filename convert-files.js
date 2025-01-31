@@ -149,7 +149,7 @@ const amendLink = (page, markdownPageName, redirects) => {
 const amendAssetLink = (page, markdownPageName) => {
   page = page.replace(
     /<figure>\s*<img src="([^"]+)" title="([^"]+)"\s*\/?>\s*<figcaption>[^<]+<\/figcaption>\s*<\/figure>/g,
-    (_, src, title) => `![${title}](/assets/${src})`
+    (_, src, title) => `![${title}]({{site.baseurl}}/assets/${src})`
   )
 return page
 }
