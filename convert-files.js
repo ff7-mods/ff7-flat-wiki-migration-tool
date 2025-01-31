@@ -73,9 +73,9 @@ const cleanLink = (link, currentPage, redirects) => {
       if (link.includes('#')) {
         const hashIndex = link.indexOf('#')
         const hash = link.substring(hashIndex)
-        link = `${link.substring(0, hashIndex)}.md${hash}`
+        link = `${link.substring(0, hashIndex)}${hash}`
       } else {
-        link = link + '.md'
+        link = link
       }
     }
     let relativeLink = path.relative(currentPage, link)
@@ -146,6 +146,13 @@ const amendLink = (page, markdownPageName, redirects) => {
   //   console.log('page', page)
   return page
 }
+const amendAssetLink = (page, markdownPageName) => {
+  page = page.replace(
+    /<figure>\s*<img src="([^"]+)" title="([^"]+)"\s*\/?>\s*<figcaption>[^<]+<\/figcaption>\s*<\/figure>/g,
+    (_, src, title) => `![${title}](/assets/${src})`
+  )
+return page
+}
 const addBreadcrumb = (page, markdownPageName, redirects) => {
   const breadcrumbs = [{ title: 'Home', link: cleanLink(`Main_Page`, markdownPageName, redirects) }]
   const prevSection = []
@@ -185,6 +192,7 @@ const amendLinks = async () => {
     page = amendHTMLLink(page, markdownPageName, redirects)
     // page = addBreadcrumb(page, markdownPageName, redirects)
     page = addFrontMatter(page, markdownPageName)
+    page = amendAssetLink(page, markdownPageName)
 
     const markdownDir = path.dirname(markdownFile)
     await fs.ensureDir(markdownDir)

@@ -65,7 +65,7 @@ const downloadFiles = async () => {
 
   $('.TablePager_col_img_name').each(async (i, cellEle) => {
     const links = $(cellEle).find('a').toArray()
-    const fileName = links[0].attribs.href.replace('/index.php?title=', '').replace('File:', '')
+    const fileName = links[0].attribs.href.replace('/index.php/', '').replace('File:', '')
     const file = path.join(OUTPUT_DIR_ASSETS, fileName)
     const dir = path.dirname(file)
     await fs.ensureDir(dir)
